@@ -1,4 +1,4 @@
 from . import models
 from . import utils
-from .train import *
 from .predict import *
+from .train import *

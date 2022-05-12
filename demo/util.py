@@ -16,6 +16,7 @@ def get_arch_net(root, arch, training=True, vocab_pth=None, **kwargs):
 
     if training:
         net = network_factory[arch](**kwargs)
+        print(kwargs)
         return model_root, net
     else:
         if isinstance(vocab_pth, (list, tuple)):

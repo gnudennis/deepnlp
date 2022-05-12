@@ -122,26 +122,32 @@ class Seq2SeqDecoder(Decoder):
 
 
 class Seq2SeqAttentionDecoder(AttentionDecoder):
-    def __init__(self, vocab_size, embed_size, dec_hidden_size, num_layers,
+    def __init__(self, vocab_size, embed_size, enc_hidden_size, dec_hidden_size, num_layers,
                  dropout=0,
                  enc_bidirectional=True,
-                 fc_dec_embed_included=False,
+                 fc_dec_embed_included=True,
+                 fc_enc_context_included=True,
                  **kwargs):
         super(Seq2SeqAttentionDecoder, self).__init__(**kwargs)
 
         self.fc_dec_embed_included = fc_dec_embed_included
+        self.fc_enc_context_included = fc_enc_context_included
 
         if enc_bidirectional:
             num_directions = 2
         else:
             num_directions = 1
 
-        self.attention = AdditiveAttention(dec_hidden_size * num_directions, dec_hidden_size, dec_hidden_size, dropout)
+        self.attention = AdditiveAttention(enc_hidden_size * num_directions, dec_hidden_size, dec_hidden_size, dropout)
         self.embedding = nn.Embedding(vocab_size, embed_size)
-        self.rnn = nn.GRU(embed_size + dec_hidden_size * num_directions, dec_hidden_size, num_layers, dropout=dropout)
+        self.rnn = nn.GRU(embed_size + enc_hidden_size * num_directions, dec_hidden_size, num_layers, dropout=dropout)
 
-        if self.fc_dec_embed_included:
+        if self.fc_dec_embed_included and self.fc_enc_context_included:
+            self.fc_out = nn.Linear(dec_hidden_size + enc_hidden_size * num_directions + embed_size, vocab_size)
+        elif self.fc_dec_embed_included:
             self.fc_out = nn.Linear(dec_hidden_size + embed_size, vocab_size)
+        elif self.fc_enc_context_included:
+            self.fc_out = nn.Linear(dec_hidden_size + enc_hidden_size * num_directions, vocab_size)
         else:
             self.fc_out = nn.Linear(dec_hidden_size, vocab_size)
 
@@ -167,7 +173,9 @@ class Seq2SeqAttentionDecoder(AttentionDecoder):
         embedded = self.dropout(self.embedding(dec_X).permute(1, 0, 2))
         # embedded = [tgt_len, batch_size, embed_size]
 
-        output, self._attention_weights = [], []
+        outputs, self._attention_weights = [], []
+
+        context_cat = []
 
         for x in embedded:
             # x = [batch_size, embed_size]
@@ -185,19 +193,28 @@ class Seq2SeqAttentionDecoder(AttentionDecoder):
             out, hidden_state = self.rnn(x.permute(1, 0, 2), hidden_state)
             # out = [1, batch_size, dec_hidden_size]
             # hidden_state = [num_layers, batch_size, dec_hidden_size]
-            output.append(out)
+            outputs.append(out)
+            context_cat.append(context)
+
             self._attention_weights.append(self.attention.attention_weights)
 
-        output = torch.cat(output, dim=0)
-        # output = [tgt_len, batch_size, N]
+        outputs = torch.cat(outputs, dim=0)
+        # outputs = [tgt_len, batch_size, N]
 
-        if self.fc_dec_embed_included:
-            output = torch.cat((output, embedded), dim=-1)
+        context = torch.cat(context_cat, dim=1).permute(1, 0, 2)
+        # context = [tgt_len, batch_size, N]
 
-        output = self.fc_out(output).permute(1, 0, 2)
-        # output = [batch_size, tgt_len, vocab_size]
+        if self.fc_dec_embed_included and self.fc_enc_context_included:
+            outputs = torch.cat((outputs, embedded, context), dim=-1)
+        elif self.fc_dec_embed_included:
+            outputs = torch.cat((outputs, embedded), dim=-1)
+        elif self.fc_enc_context_included:
+            outputs = torch.cat((outputs, context), dim=-1)
 
-        return output, [enc_outputs, hidden_state, enc_valid_lens]
+        outputs = self.fc_out(outputs).permute(1, 0, 2)
+        # outputs = [batch_size, tgt_len, vocab_size]
+
+        return outputs, [enc_outputs, hidden_state, enc_valid_lens]
 
     @property
     def attention_weights(self):
@@ -239,16 +256,18 @@ def seq2seq_attn_model(
         dropout=0,
         bidirectional=True,
         use_pack_padded_sequence=True,
-        fc_dec_embed_included=True
+        fc_dec_embed_included=True,
+        fc_enc_context_included=True
 ) -> EncoderDecoder:
     encoder = Seq2SeqEncoder(src_vocab_size, embed_size, enc_hidden_size, dec_hidden_size, num_layers,
                              dropout=dropout,
                              bidirectional=bidirectional,
                              use_pack_padded_sequence=use_pack_padded_sequence)
-    decoder = Seq2SeqAttentionDecoder(tgt_vocab_size, embed_size, dec_hidden_size, num_layers,
+    decoder = Seq2SeqAttentionDecoder(tgt_vocab_size, embed_size, enc_hidden_size, dec_hidden_size, num_layers,
                                       dropout=dropout,
                                       enc_bidirectional=bidirectional,
-                                      fc_dec_embed_included=fc_dec_embed_included)
+                                      fc_dec_embed_included=fc_dec_embed_included,
+                                      fc_enc_context_included=fc_enc_context_included)
 
     net = EncoderDecoder(encoder, decoder)
     return net

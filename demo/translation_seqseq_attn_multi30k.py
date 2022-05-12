@@ -23,6 +23,7 @@ def args(training=True):
     parser.add_argument('--bidirectional', default=True, help='bidirectional')
     parser.add_argument('--use-pack-padded-sequence', default=True, help='use pack padded sequence')
     parser.add_argument('--fc-dec-embed-included', default=True, help='fc decoder embed included')
+    parser.add_argument('--fc-enc-context-included', default=True, help='fc encoder context included')
 
     if training:
         parser.add_argument('--dropout', default=0.1, help='dropout')
@@ -65,7 +66,8 @@ def train(args: argparse.Namespace):
         dropout=args.dropout,
         bidirectional=args.bidirectional,
         use_pack_padded_sequence=args.use_pack_padded_sequence,
-        fc_dec_embed_included=args.fc_dec_embed_included
+        fc_dec_embed_included=args.fc_dec_embed_included,
+        fc_enc_context_included=args.fc_enc_context_included
     )
     saved_path = os.path.join(model_root, args.saved_pth)
     src_vocab_path = os.path.join(model_root, args.src_vocab_pth)

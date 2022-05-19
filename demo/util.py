@@ -1,13 +1,14 @@
 import os
 import pickle
 
-from core.translation.models import seq2seq_model, seq2seq_attn_model
+from core.translation.models import seq2seq_model, seq2seq_attn_model, transformer_model
 
 
 def get_arch_net(root, arch, training=True, vocab_pth=None, **kwargs):
     network_factory = {
         'translation_seqseq': seq2seq_model,
         'translation_seqseq_attn': seq2seq_attn_model,
+        'translation_transformer': transformer_model,
     }
     assert arch in network_factory.keys(), f'{arch} is not supported.'
 

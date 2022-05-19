@@ -12,26 +12,22 @@ from core import translation
 def args(training=True):
     parser = argparse.ArgumentParser(description="train and save your model")
 
-    parser.add_argument('--arch', default='translation_seqseq', help='architecture')
-    parser.add_argument('--embed-size', default=64, help='embed size')
-    parser.add_argument('--enc-hidden-size', default=32, help='enc hidden size')
-    parser.add_argument('--dec-hidden-size', default=32, help='dec hidden size')
-    parser.add_argument('--num-layers', default=2, help='num of rnn layers')
+    parser.add_argument('--arch', default='translation_transformer', help='architecture')
+    parser.add_argument('--num-layers', default=2, help='num of layers')
+    parser.add_argument('--hidden-size', default=8, help='hidden size')
+    parser.add_argument('--ffn-hidden-size', default=64, help='ffn hidden size')
+    parser.add_argument('--num-heads', default=4, help='num of multi-head attentions')
     parser.add_argument('--src-vocab-pth', default='src_vocab.bin', help='path for the source vocab')
     parser.add_argument('--tgt-vocab-pth', default='tgt_vocab.bin', help='path for the target vocab')
-    parser.add_argument('--bidirectional', default=True, help='bidirectional')
-    parser.add_argument('--use-pack-padded-sequence', default=True, help='use pack padded sequence')
-    parser.add_argument('--fc-dec-embed-included', default=True, help='fc decoder embed included')
-    parser.add_argument('--fc-enc-context-included', default=True, help='fc encoder context included')
 
     if training:
         parser.add_argument('--dropout', default=0.1, help='dropout')
         parser.add_argument('--batch-size', default=64, help='batch size')
         parser.add_argument('--learning-rate', default=0.005, help='learning rate')
         parser.add_argument('--num-epochs', default=20, help="number of epochs")
-        parser.add_argument('--saved-pth', default='translation_seqseq.pth', help='path for the trained model')
+        parser.add_argument('--saved-pth', default='translation_transformer.pth', help='path for the trained model')
     else:
-        parser.add_argument('--weights-pth', default='translation_seqseq.pth', help='net weights')
+        parser.add_argument('--weights-pth', default='translation_transformer.pth', help='net weights')
         parser.add_argument('--src-sentence',
                             default='Zwei junge weiße Männer sind im Freien in der Nähe vieler Büsche.',
                             help='source sentence test')
@@ -56,15 +52,11 @@ def train(args: argparse.Namespace):
         training=True,
         src_vocab_size=len(src_vocab),
         tgt_vocab_size=len(tgt_vocab),
-        embed_size=args.embed_size,
-        enc_hidden_size=args.enc_hidden_size,
-        dec_hidden_size=args.dec_hidden_size,
+        hidden_size=args.hidden_size,
+        ffn_hidden_size=args.ffn_hidden_size,
+        num_heads=args.num_heads,
         num_layers=args.num_layers,
-        dropout=args.dropout,
-        bidirectional=args.bidirectional,
-        use_pack_padded_sequence=args.use_pack_padded_sequence,
-        fc_dec_embed_included=args.fc_dec_embed_included,
-        fc_enc_context_included=args.fc_enc_context_included
+        dropout=args.dropout
     )
 
     saved_path = os.path.join(model_root, args.saved_pth)
@@ -179,11 +171,15 @@ def predict(args: argparse.Namespace):
 
 
 if __name__ == '__main__':
-    # parser = args()
-    # args, unknown = parser.parse_known_args()
-    # train(args)
-
-    parser = args(training=False)
+    parser = args()
     args, unknown = parser.parse_known_args()
-    evaluate(args)
+    train(args)
+
+    # parser = args(training=False)
+    # args, unknown = parser.parse_known_args()
+    # evaluate(args)
     # predict(args)
+
+
+from d2l import torch as d2l
+d2l.transpose_qkv()
